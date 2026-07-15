@@ -5,10 +5,10 @@ author: Microsoft
 ms.date: 2026-07-15
 ms.topic: tutorial
 keywords:
-	- azure ai foundry
-	- azure openai
-	- token usage
-	- python
+  - azure ai foundry
+  - azure openai
+  - token usage
+  - python
 estimated_reading_time: 10
 ---
 
