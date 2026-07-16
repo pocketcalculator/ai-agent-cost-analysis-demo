@@ -400,8 +400,8 @@ def run_live_once(
     deployment: str,
     prompt: str,
     tools: list[dict[str, Any]],
-) -> tuple[object, list[str]]:
-    """Run one live request, execute mock tool calls, and return final response."""
+) -> tuple[object, list[str], list[dict[str, Any]]]:
+    """Run one live request, execute mock tool calls, and return final response, tool names, and results."""
     client = create_client(
         endpoint=endpoint,
         deployment=deployment,
@@ -420,7 +420,7 @@ def run_live_once(
 
     tool_calls = parse_tool_calls(first_response)
     if not tool_calls:
-        return first_response, []
+        return first_response, [], []
 
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": "You are a concise cloud cost analysis assistant."},
@@ -435,6 +435,7 @@ def run_live_once(
     messages.append(assistant_message)
 
     executed_tool_names: list[str] = []
+    tool_results: list[dict[str, Any]] = []
     for call in tool_calls:
         function_obj = call.get("function") or {}
         function_name = str(function_obj.get("name") or "unknown_tool")
@@ -449,6 +450,11 @@ def run_live_once(
                 parsed_args = {}
 
         tool_result = execute_mock_tool(function_name, parsed_args)
+        tool_results.append({
+            "function_name": function_name,
+            "arguments": parsed_args,
+            "result": tool_result,
+        })
         messages.append(
             {
                 "role": "tool",
@@ -466,7 +472,7 @@ def run_live_once(
         tool_choice="none",
     )
 
-    return final_response, executed_tool_names
+    return final_response, executed_tool_names, tool_results
 
 
 def run(args: argparse.Namespace) -> int:
@@ -511,7 +517,7 @@ def run(args: argparse.Namespace) -> int:
     tools_schema = create_tool_schema(args.tool_count)
     endpoint, api_key, api_version, deployment = live_settings
     try:
-        response, executed_tools = run_live_once(
+        response, executed_tools, tool_results = run_live_once(
             endpoint=endpoint,
             api_key=api_key,
             api_version=api_version,
@@ -533,6 +539,20 @@ def run(args: argparse.Namespace) -> int:
     print(f"tools_invoked: {len(executed_tools)}")
     if executed_tools:
         print(f"invoked_tool_names: {', '.join(executed_tools)}")
+
+    print("\n=== Raw Prompt ===")
+    print(args.prompt)
+
+    print("\n=== All Tool Definitions Loaded in Schema ===")
+    print(json.dumps(tools_schema, indent=2))
+
+    if tool_results:
+        print("\n=== Tool Invocations and Results ===")
+        for i, tool_data in enumerate(tool_results, 1):
+            print(f"\nTool {i}: {tool_data['function_name']}")
+            if tool_data['arguments']:
+                print(f"Arguments: {json.dumps(tool_data['arguments'], indent=2)}")
+            print(f"Result: {json.dumps(tool_data['result'], indent=2)}")
 
     invoked_tool_name_set = set(executed_tools)
     unused_tools = [
