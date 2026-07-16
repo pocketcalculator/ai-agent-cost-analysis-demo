@@ -1,7 +1,7 @@
 ---
 title: Token Consumption Management Simulators
 description: Focused guide for running simulator scripts that explain and control token usage
-author: Microsoft
+author: Paul Sczurek
 ms.date: 2026-07-16
 ms.topic: tutorial
 keywords:
