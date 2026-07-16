@@ -411,7 +411,7 @@ def run_live_once(
     first_response = client.chat.completions.create(
         model=deployment,
         messages=[
-            {"role": "system", "content": "You are a concise cloud cost analysis assistant."},
+            {"role": "system", "content": "You are a retail customer support operator."},
             {"role": "user", "content": prompt},
         ],
         tools=cast(Any, tools),
@@ -423,7 +423,7 @@ def run_live_once(
         return first_response, [], []
 
     messages: list[dict[str, Any]] = [
-        {"role": "system", "content": "You are a concise cloud cost analysis assistant."},
+        {"role": "system", "content": "You are a retail customer support operator."},
         {"role": "user", "content": prompt},
     ]
 

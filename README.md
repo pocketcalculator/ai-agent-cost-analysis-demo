@@ -1,139 +1,159 @@
 ---
-title: Azure Foundry Token Usage Demo
-description: End-to-end tutorial for a multi-script Azure Foundry cost optimization demo repository
+title: Token Consumption Management Simulators
+description: Focused guide for running simulator scripts that explain and control token usage
 author: Microsoft
-ms.date: 2026-07-15
+ms.date: 2026-07-16
 ms.topic: tutorial
 keywords:
+  - token consumption
+  - simulation
   - azure ai foundry
-  - azure openai
-  - token usage
+  - gemini
   - python
-estimated_reading_time: 10
+estimated_reading_time: 8
 ---
 
-## Repository Goal
+## Goal
 
-This repository demonstrates agent-centric cost optimization workflows with reusable Python modules and focused scripts.
+This repository contains practical simulations that help you understand and control token usage patterns in AI-agent workflows.
 
-The baseline deployment configured in this workspace is:
+This README focuses on three scripts:
 
-* Resource group: `rg-foundry-cost-demo`
-* Account: `foundrycostdemo42288`
-* Project: `cost-agent-demo`
-* Deployment name: `cost-helper-chat`
-* Model: `gpt-5.4-mini` (`2026-03-17`)
-* SKU: `GlobalStandard`
+* [scripts/simulation/tool_schema_ab_measurement.py](scripts/simulation/tool_schema_ab_measurement.py)
+* [scripts/simulation/circuit_breaker_simulator.py](scripts/simulation/circuit_breaker_simulator.py)
+* [scripts/simulation/manager_worker_routing_simulator.py](scripts/simulation/manager_worker_routing_simulator.py)
 
-## Directory Structure
+## Script Summaries
 
-```text
-ai-agent-cost-analysis-demo/
-├─ costdemo/
-│  ├─ cli.py
-│  ├─ costing.py
-│  ├─ foundry_client.py
-│  ├─ models.py
-│  └─ utils.py
-├─ scripts/
-│  ├─ agent/
-│  │  └─ agent_cost_summary.py
-│  ├─ analysis/
-│  │  └─ token_cost_breakdown.py
-│  ├─ pricing/
-│  │  └─ estimate_from_usage_json.py
-│  └─ simulation/
-│     └─ scenario_cost_simulator.py
-├─ main.py
-├─ .env.example
-├─ pyproject.toml
-└─ README.md
-```
+### Run tool_schema_ab_measurement.py
 
-## Core Command
+Compares prompt-token overhead between a larger tool schema and a smaller comparison schema using live Azure Foundry calls.
 
-Primary end-to-end demo:
+What it demonstrates:
 
-```bash
-~/.local/bin/uv run scripts/agent/agent_cost_summary.py --show-raw-usage
-```
+* How unused tools inflate prompt tokens
+* First-call and second-call token deltas
+* Total overhead from schema size alone
 
-Backwards-compatible command:
+### Run circuit_breaker_simulator.py
 
-```bash
-~/.local/bin/uv run main.py --show-raw-usage
-```
+Implements a pre-flight token guard that counts tokens before generation and blocks overly large requests.
 
-The command prints:
+What it demonstrates:
 
-* Model response text
-* Prompt tokens
-* Completion tokens
-* Total tokens
-* Prompt cache split (`prompt_tokens_non_cached` and `prompt_tokens_cached`)
-* Estimated cost based on env or CLI pricing
+* Prompt token counting before generation
+* Budget threshold enforcement (circuit breaker)
+* Actual usage reporting after successful calls
+* Fallback model behavior for common API availability or quota conditions
 
-## Environment Variables
+### Run manager_worker_routing_simulator.py
 
-Copy template and fill values:
+Simulates manager-worker routing where a cheaper model triages request complexity and escalates complex tasks to a stronger model.
+
+What it demonstrates:
+
+* Tiered model orchestration for cost control
+* Retry behavior under throttling and temporary service issues
+* Fast-fail behavior with bounded timeout and retry attempts
+* Graceful handling when model responses are unavailable
+
+## Environment Setup
+
+### Option 1: uv (recommended)
+
+From the repository root:
 
 ```bash
 cp .env.example .env
+~/.local/bin/uv sync
 ```
+
+### Option 2: pip and venv
+
+From the repository root:
+
+```bash
+cp .env.example .env
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e .
+```
+
+## Environment Variables
+
+Set values in the .env file before running scripts.
+
+### For tool_schema_ab_measurement.py
 
 Required:
 
-* `AZURE_OPENAI_ENDPOINT`
-* `AZURE_OPENAI_API_KEY`
-* `AZURE_OPENAI_API_VERSION`
-* `AZURE_OPENAI_DEPLOYMENT`
+* AZURE_OPENAI_ENDPOINT
+* AZURE_OPENAI_API_KEY
+* AZURE_OPENAI_API_VERSION
+* AZURE_OPENAI_DEPLOYMENT
 
-Optional pricing:
+### For circuit_breaker_simulator.py and manager_worker_routing_simulator.py
 
-* `INPUT_PRICE_PER_1M`
-* `OUTPUT_PRICE_PER_1M`
-* `CACHED_INPUT_PRICE_PER_1M`
+Required:
 
-## Additional Demo Scripts
+* GEMINI_API_KEY
 
-Token totals from saved payload:
+Optional:
 
-```bash
-~/.local/bin/uv run scripts/analysis/token_cost_breakdown.py usage.json
-```
+* GEMINI_MODEL
 
-Cost estimate from saved payload:
+## Run Commands
 
-```bash
-~/.local/bin/uv run scripts/pricing/estimate_from_usage_json.py usage.json --input-price-per-1m 0.75 --output-price-per-1m 4.50
-```
+### tool_schema_ab_measurement.py
 
-Monthly simulation from request assumptions:
+With uv:
 
 ```bash
-~/.local/bin/uv run scripts/simulation/scenario_cost_simulator.py --requests-per-month 100000 --avg-prompt-tokens 300 --avg-completion-tokens 500 --input-price-per-1m 0.75 --output-price-per-1m 4.50
+~/.local/bin/uv run scripts/simulation/tool_schema_ab_measurement.py
 ```
 
-Single-iteration simulation for tool-schema bloat (uses `INPUT_PRICE_PER_1M` from `.env` by default):
+With pip and activated venv:
 
 ```bash
-~/.local/bin/uv run scripts/simulation/tool_schema_bloat_simulator.py
+python scripts/simulation/tool_schema_ab_measurement.py
 ```
 
-Realistic mode using your Foundry endpoint (uses `.env` endpoint/key/deployment settings):
+Example with explicit schema sizes:
 
 ```bash
-~/.local/bin/uv run scripts/simulation/tool_schema_bloat_simulator.py
+~/.local/bin/uv run scripts/simulation/tool_schema_ab_measurement.py --tool-count 10 --comparison-tool-count 3
 ```
 
-Optional override if you want to force a price from CLI:
+### circuit_breaker_simulator.py
+
+With uv:
 
 ```bash
-~/.local/bin/uv run scripts/simulation/tool_schema_bloat_simulator.py --input-price-per-1m 0.75
+~/.local/bin/uv run scripts/simulation/circuit_breaker_simulator.py
 ```
 
-## Naming Conventions
+With pip and activated venv:
 
-* Keep reusable logic in `costdemo/`.
-* Keep one executable concern per file under `scripts/<domain>/`.
-* Use descriptive names with `domain_action.py`, for example `token_cost_breakdown.py`.
+```bash
+python scripts/simulation/circuit_breaker_simulator.py
+```
+
+### manager_worker_routing_simulator.py
+
+With uv:
+
+```bash
+~/.local/bin/uv run scripts/simulation/manager_worker_routing_simulator.py
+```
+
+With pip and activated venv:
+
+```bash
+python scripts/simulation/manager_worker_routing_simulator.py
+```
+
+## Notes
+
+* If you hit 429 quota errors, the Gemini-based simulators may return no model output while still completing the script flow.
+* manager_worker_routing_simulator.py uses bounded retries and a request timeout to avoid long apparent hangs.
