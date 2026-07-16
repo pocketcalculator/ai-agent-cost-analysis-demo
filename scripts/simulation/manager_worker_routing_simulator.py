@@ -10,17 +10,44 @@ load_dotenv()
 # Initialize the GenAI SDK
 # The client automatically picks up the GEMINI_API_KEY environment variable.
 # Ensure you have run: export GEMINI_API_KEY="your-api-key"
-REQUEST_TIMEOUT_MS = 15000
+REQUEST_TIMEOUT_MS = 120000
 MAX_ATTEMPTS = 3
 client = genai.Client(http_options={"timeout": REQUEST_TIMEOUT_MS})
 
 # Define our tiered models
 MANAGER_MODEL = 'gemini-flash-latest'
-WORKER_MODEL = 'gemini-2.5-pro'
+WORKER_MODEL = 'gemini-3.1-pro-preview'
 
 EXIT_SUCCESS = 0
 EXIT_FAILURE = 1
 EXIT_INTERRUPTED = 130
+
+
+def token_usage_or_zero(response) -> tuple[int, int, int, int]:
+    """Return prompt, output, cached, and total token counts from usage metadata."""
+    usage = getattr(response, "usage_metadata", None)
+    if usage is None:
+        return (0, 0, 0, 0)
+
+    prompt_tokens = int(getattr(usage, "prompt_token_count", 0) or 0)
+    output_tokens = int(getattr(usage, "candidates_token_count", 0) or 0)
+    cached_tokens = int(getattr(usage, "cached_content_token_count", 0) or 0)
+    total_tokens = int(getattr(usage, "total_token_count", 0) or 0)
+    return (prompt_tokens, output_tokens, cached_tokens, total_tokens)
+
+
+def print_usage_line(label: str, response) -> tuple[int, int, int, int]:
+    """Print token usage for a single model call and return parsed counts."""
+    prompt_tokens, output_tokens, cached_tokens, total_tokens = token_usage_or_zero(response)
+    if response is None:
+        print(f"-> Tokens [{label}]: unavailable (request failed)")
+        return (0, 0, 0, 0)
+
+    print(
+        f"-> Tokens [{label}]: "
+        f"prompt={prompt_tokens}, output={output_tokens}, cached={cached_tokens}, total={total_tokens}"
+    )
+    return (prompt_tokens, output_tokens, cached_tokens, total_tokens)
 
 
 def should_retry_api_error(exc: errors.APIError) -> bool:
@@ -103,6 +130,10 @@ def run_routing_demo():
             model=MANAGER_MODEL,
             contents=router_prompt.format(task=task),
         )
+        route_prompt, route_output, route_cached, route_total = print_usage_line(
+            "Manager Route Check",
+            route_response,
+        )
         
         # Clean up the output to ensure we just get the keyword
         decision_text = response_text_or_empty(route_response)
@@ -117,22 +148,38 @@ def run_routing_demo():
         if "COMPLEX" in decision:
             print(f"-> ACTION: Escalating task to Worker ({WORKER_MODEL})...")
             response = generate_with_retry(model=WORKER_MODEL, contents=task)
+            exec_prompt, exec_output, exec_cached, exec_total = print_usage_line(
+                "Worker Execution",
+                response,
+            )
             
-            # Print a snippet of the output (first 150 characters) to keep the terminal clean
-            snippet = response_text_or_empty(response).replace('\n', ' ')[:150]
-            if snippet:
-                print(f"\n[Worker Output Snippet]: {snippet}...\n")
+            full_response = response_text_or_empty(response)
+            if full_response:
+                print(f"\n[Worker Output]: {full_response}\n")
             else:
-                print("\n[Worker Output Snippet]: <no response text>\n")
+                print("\n[Worker Output]: <no response text>\n")
         else:
             print(f"-> ACTION: Resolving task directly with Manager ({MANAGER_MODEL})...")
             response = generate_with_retry(model=MANAGER_MODEL, contents=task)
+            exec_prompt, exec_output, exec_cached, exec_total = print_usage_line(
+                "Manager Execution",
+                response,
+            )
             
-            snippet = response_text_or_empty(response).replace('\n', ' ')
-            if snippet:
-                print(f"\n[Manager Output]: {snippet}\n")
+            full_response = response_text_or_empty(response)
+            if full_response:
+                print(f"\n[Manager Output]: {full_response}\n")
             else:
                 print("\n[Manager Output]: <no response text>\n")
+
+        print("-> Scenario Token Summary:")
+        print(
+            "   "
+            f"prompt={route_prompt + exec_prompt}, "
+            f"output={route_output + exec_output}, "
+            f"cached={route_cached + exec_cached}, "
+            f"total={route_total + exec_total}"
+        )
             
     print("Takeaway: Filter and route with a fast, cheap model first to save your budget!")
 

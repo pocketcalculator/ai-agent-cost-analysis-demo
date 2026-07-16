@@ -17,9 +17,10 @@ estimated_reading_time: 8
 
 This repository contains practical simulations that help you understand and control token usage patterns in AI-agent workflows.
 
-This README focuses on three scripts:
+This README focuses on four scripts:
 
 * [scripts/simulation/tool_schema_ab_measurement.py](scripts/simulation/tool_schema_ab_measurement.py)
+* [scripts/simulation/chat_history_bloat_simulator.py](scripts/simulation/chat_history_bloat_simulator.py)
 * [scripts/simulation/circuit_breaker_simulator.py](scripts/simulation/circuit_breaker_simulator.py)
 * [scripts/simulation/manager_worker_routing_simulator.py](scripts/simulation/manager_worker_routing_simulator.py)
 
@@ -34,6 +35,16 @@ What it demonstrates:
 * How unused tools inflate prompt tokens
 * First-call and second-call token deltas
 * Total overhead from schema size alone
+
+### Run chat_history_bloat_simulator.py
+
+Simulates one live request with long multi-turn conversation history to show how stale context increases prompt tokens and cost.
+
+What it demonstrates:
+
+* Prompt growth from accumulated chat turns
+* One-turn cost impact from historical context bloat
+* Token and cost reporting using live response usage
 
 ### Run circuit_breaker_simulator.py
 
@@ -84,7 +95,7 @@ python -m pip install -e .
 
 Set values in the .env file before running scripts.
 
-### For tool_schema_ab_measurement.py
+### For tool_schema_ab_measurement.py and chat_history_bloat_simulator.py
 
 Required:
 
@@ -92,6 +103,11 @@ Required:
 * AZURE_OPENAI_API_KEY
 * AZURE_OPENAI_API_VERSION
 * AZURE_OPENAI_DEPLOYMENT
+
+For chat_history_bloat_simulator.py, also provide one of these:
+
+* INPUT_PRICE_PER_1M
+* AZURE_OPENAI_INPUT_PRICE_PER_1M
 
 ### For circuit_breaker_simulator.py and manager_worker_routing_simulator.py
 
@@ -123,6 +139,26 @@ Example with explicit schema sizes:
 
 ```bash
 ~/.local/bin/uv run scripts/simulation/tool_schema_ab_measurement.py --tool-count 10 --comparison-tool-count 3
+```
+
+### chat_history_bloat_simulator.py
+
+With uv:
+
+```bash
+~/.local/bin/uv run scripts/simulation/chat_history_bloat_simulator.py
+```
+
+With pip and activated venv:
+
+```bash
+python scripts/simulation/chat_history_bloat_simulator.py
+```
+
+Example with an explicit history length:
+
+```bash
+~/.local/bin/uv run scripts/simulation/chat_history_bloat_simulator.py --history-turns 40
 ```
 
 ### circuit_breaker_simulator.py
