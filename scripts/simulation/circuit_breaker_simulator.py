@@ -1,5 +1,6 @@
 import os
 import json
+from typing import Any
 
 from google import genai
 from google.genai import errors
@@ -54,12 +55,16 @@ def print_actual_usage(response: object) -> None:
         print("Actual Usage: unavailable (no usage_metadata in response).")
         return
 
-    prompt_tokens = getattr(usage, "prompt_token_count", 0)
-    output_tokens = getattr(usage, "candidates_token_count", 0)
-    total_tokens = getattr(usage, "total_token_count", 0)
-    
-    # Check for the hidden tokens
-    cached_tokens = getattr(usage, "cached_content_token_count", 0)
+    def _to_int(value: Any) -> int:
+        # Some SDK fields may exist but be None.
+        return int(value) if value is not None else 0
+
+    prompt_tokens = _to_int(getattr(usage, "prompt_token_count", 0))
+    output_tokens = _to_int(getattr(usage, "candidates_token_count", 0))
+    total_tokens = _to_int(getattr(usage, "total_token_count", 0))
+
+    # Check for hidden/optional cached tokens.
+    cached_tokens = _to_int(getattr(usage, "cached_content_token_count", 0))
 
     print("\n--- ACTUAL API TOKEN USAGE ---")
     print(f"Prompt Tokens: {prompt_tokens}")
